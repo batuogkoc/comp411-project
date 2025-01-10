@@ -24,7 +24,7 @@ def predict_masks(predictor: SAM2ImagePredictor, image):
         return masks
 
 def _predict_masks_test():
-    raw_dataset = load_dataset("kowndinya23/Kvasir-SEG")
+    raw_dataset = load_dataset("nateraw/pascal-voc-2012")
     train_set = raw_dataset["train"]
 
     predictor = SAM2ImagePredictor(build_sam2(model_cfg, checkpoint))
@@ -33,7 +33,7 @@ def _predict_masks_test():
     fig, axs = plt.subplots(len(sample_idxs),2+3)
     for i in sample_idxs:
         image = train_set[i]["image"]
-        mask_gt = train_set[i]["annotation"]
+        mask_gt = train_set[i]["mask"]
         # name, image, mask = train_set[i].items()
         axs[i,0].imshow(image)
         axs[i,1].imshow(mask_gt)
@@ -46,16 +46,16 @@ def _predict_masks_test():
     fig.savefig("single.png")
 
 def _generate_masks():
-    raw_dataset = load_dataset("kowndinya23/Kvasir-SEG")
+    raw_dataset = load_dataset("nateraw/pascal-voc-2012")
     train_set = raw_dataset["train"]
 
     mask_generator = SAM2AutomaticMaskGenerator(build_sam2(model_cfg, checkpoint))
 
-    sample_idxs = [0,1,2,3,4]
+    sample_idxs = [0,1]
     fig, axs = plt.subplots(len(sample_idxs),2+3)
     for i in sample_idxs:
         image = np.array(train_set[i]["image"].convert("RGB"))
-        mask_gt = train_set[i]["annotation"]
+        mask_gt = train_set[i]["mask"]
         axs[i,0].imshow(image)
         axs[i,1].imshow(mask_gt)
 
@@ -65,7 +65,7 @@ def _generate_masks():
                 segmentation = mask["segmentation"]
                 axs[i,2+j].imshow(segmentation)
 
-    fig.savefig("eval_single.png")
+    fig.savefig("voc_test.png")
 
 if __name__ == "__main__":
     _generate_masks()
