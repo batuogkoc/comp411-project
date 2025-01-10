@@ -51,8 +51,10 @@ def _generate_masks():
 
     mask_generator = SAM2AutomaticMaskGenerator(build_sam2(model_cfg, checkpoint))
 
-    sample_idxs = [0,1,2,3,4]
+    sample_idxs = range(10)
+    plt.axis("off")
     fig, axs = plt.subplots(len(sample_idxs),2+3)
+
     for i in sample_idxs:
         image = np.array(train_set[i]["image"].convert("RGB"))
         mask_gt = train_set[i]["annotation"]
