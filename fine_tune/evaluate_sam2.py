@@ -6,7 +6,6 @@ from sam2.sam2_image_predictor import SAM2ImagePredictor
 from PIL import Image
 import numpy as np
 from tqdm import tqdm
-from sklearn.metrics import jaccard_score
 
 # Paths
 checkpoint = "./checkpoints/sam2.1_hiera_large.pt"
@@ -46,31 +45,27 @@ for image_file, mask_file in tqdm(zip(image_files, mask_files), total=len(image_
     image = Image.open(image_path).convert("RGB")
     ground_truth_mask = np.array(Image.open(mask_path).convert("L"))
 
-    width, height = image.size
+    # Ensure ground truth mask is binary
+    ground_truth_mask = (ground_truth_mask > 0).astype(np.uint8)
 
     # Run SAM2 predictor
     with torch.inference_mode(), torch.autocast("cuda", dtype=torch.bfloat16):
         predictor.set_image(image)
+        width, height = image.size
         masks, _, _ = predictor.predict(box=np.array([0, 0, width, height]))
 
     # Convert predicted mask to binary
-    predicted_mask = (masks[0] > 0.5).astype(np.uint8)  # Thresholding to binary
+    predicted_mask = (masks[0] > 0.5).astype(np.uint8)
 
-    # Convert ground truth mask to binary (ensure consistency)
-    ground_truth_mask = (ground_truth_mask > 0).astype(np.uint8)
+    # Resize predicted mask to match the shape of the ground truth mask
+    predicted_mask_resized = np.array(
+        Image.fromarray(predicted_mask).resize(ground_truth_mask.shape[::-1], resample=Image.NEAREST)
+    )
 
-    # Ensure both masks are flattened and of the same size
-    predicted_mask_flat = predicted_mask.flatten()
-    ground_truth_mask_flat = ground_truth_mask.flatten()
-
-    # Ensure consistent sizes
-    if predicted_mask_flat.size != ground_truth_mask_flat.size:
-        print(f"Size mismatch detected: Predicted ({predicted_mask_flat.size}), Ground Truth ({ground_truth_mask_flat.size}). Resizing...")
-        predicted_mask_flat = predicted_mask_flat[:ground_truth_mask_flat.size]
-        ground_truth_mask_flat = ground_truth_mask_flat[:predicted_mask_flat.size]
-   
-   # Calculate IoU
-    iou = jaccard_score(ground_truth_mask_flat, predicted_mask_flat, average="binary")
+    # Calculate IoU using NumPy
+    intersection = np.logical_and(predicted_mask_resized, ground_truth_mask).sum()
+    union = np.logical_or(predicted_mask_resized, ground_truth_mask).sum()
+    iou = intersection / union if union > 0 else 0
     ious.append(iou)
 
 # Calculate average IoU
