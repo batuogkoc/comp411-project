@@ -1,0 +1,2 @@
+https://towardsdatascience.com/train-fine-tune-segment-anything-2-sam-2-in-60-lines-of-code-928dd29a63b3
+https://tianrun-chen.github.io/SAM-Adaptor/
