@@ -13,7 +13,10 @@ from torch.utils.data import DataLoader
 
 def extract_points_from_mask(mask, num_points, normalize=False):
     if not isinstance(mask, np.ndarray):
-        mask = np.array(mask)
+        if isinstance(mask, torch.Tensor):
+            mask = mask.cpu().numpy()
+        else:
+            mask = np.array(mask)
     if mask.max() > 1:
         mask = (mask > 0).astype(np.uint8)
     mask_indices = np.argwhere(mask > 0)
@@ -23,7 +26,6 @@ def extract_points_from_mask(mask, num_points, normalize=False):
         selected_indices = mask_indices[
             np.random.choice(len(mask_indices), num_points, replace=False)
         ]
-    print(mask.shape)
     height, width = mask.shape
     if normalize:
         return np.flip(selected_indices, -1) / [width, height]

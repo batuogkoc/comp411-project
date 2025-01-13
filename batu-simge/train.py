@@ -38,9 +38,9 @@ def train_experiment():
             },
             "model": {
                 "checkpoint": "./checkpoints/sam2.1_hiera_large.pt",
-                "config_file": "./sam2/configs/sam2.1/sam2.1_hiera_l.yaml",
-                "train_mask_encoder": True,
-                "train_propt_encoder": True,
+                "config_file": "configs/sam2.1/sam2.1_hiera_l.yaml",
+                "train_mask_decoder": True,
+                "train_prompt_encoder": True,
                 "train_image_encoder": False,
                 "num_points": 3,
             },
@@ -94,7 +94,7 @@ def train_experiment():
     predictor.model.image_encoder.train(config["model"]["train_image_encoder"])
     predictor.model.sam_prompt_encoder.train(config["model"]["train_prompt_encoder"])
     predictor.model.sam_mask_decoder.train(config["model"]["train_mask_decoder"])
-    loss_fn = torch.nn.BCELoss()
+    loss_fn = torch.nn.BCEWithLogitsLoss()
     optimizer = optim.Adam(predictor.model.parameters(), lr=config["learning_rate"])
 
     state, metrics = train(
@@ -111,7 +111,7 @@ def train_experiment():
         tensorboard_logging=True,
         wandb_logging=True,
         metrics={
-            "mIoU": torchmetrics.segmentation.MeanIoU(1)
+            "mIoU": torchmetrics.segmentation.MeanIoU(2, input_format="index")
             # "mae": torchmetrics.MeanAbsoluteError(),
             # "mse": torchmetrics.MeanSquaredError(),
             # "acc": torchmetrics.Accuracy(task="multiclass", num_classes=10)

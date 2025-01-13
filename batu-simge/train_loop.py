@@ -68,8 +68,13 @@ def train(
                     metric.reset()
 
                 for i, (x, y) in enumerate(train_set):
+                    y = (
+                        torch.tensor(y, dtype=torch.float32, requires_grad=True)
+                        .float()
+                        .to(predictor.model.device)
+                    )
                     point_coords = extract_points_from_mask(y, num_points=num_points)
-                    point_labels = np.ones_like(point_coords)
+                    point_labels = np.ones(point_coords.shape[0])
                     predictor.set_image(x)
                     # mask_input, unnorm_coords, labels, unnorm_box = predictor._prep_prompts(point_coords=point_coords, point_labels=point_labels, normalize_coords=True, box=None, mask_logits=None)
                     # sparse_embeddings, dense_embeddings = predictor.model.sam_prompt_encoder(points=(unnorm_coords, labels), boxes=None, masks=None)
@@ -79,8 +84,12 @@ def train(
                         point_labels=point_labels,
                         return_logits=True,
                     )
-                    mask_pred = y_pred > predictor.mask_threshold
+                    y_pred = y_pred[0]
+                    mask = (y > 0).to(torch.long).cpu()
+                    mask_pred = (y_pred > predictor.mask_threshold).to(torch.long).cpu()
+
                     loss = loss_fn(y_pred, y)
+                    loss.requires_grad_(True)
 
                     predictor.model.zero_grad()
                     loss.backward()
@@ -88,7 +97,9 @@ def train(
 
                     epoch_metric_values = {}
                     for metric_name, metric in metrics.items():
-                        epoch_metric_values[metric_name] = metric(y_pred, y).item()
+                        epoch_metric_values[metric_name] = metric(
+                            mask_pred, mask
+                        ).item()
 
                     running_average_training_loss_logger.add_value(loss.item())
 
@@ -145,8 +156,13 @@ def train(
                 val_loss_logger.reset()
 
                 for i, (x, y) in enumerate(val_set):
+                    y = (
+                        torch.tensor(y, dtype=torch.float32, requires_grad=True)
+                        .float()
+                        .to(predictor.model.device)
+                    )
                     point_coords = extract_points_from_mask(y, num_points=num_points)
-                    point_labels = np.ones_like(point_coords)
+                    point_labels = np.ones(point_coords.shape[0])
                     predictor.set_image(x)
                     # mask_input, unnorm_coords, labels, unnorm_box = predictor._prep_prompts(point_coords=point_coords, point_labels=point_labels, normalize_coords=True, box=None, mask_logits=None)
                     # sparse_embeddings, dense_embeddings = predictor.model.sam_prompt_encoder(points=(unnorm_coords, labels), boxes=None, masks=None)
@@ -156,11 +172,15 @@ def train(
                         point_labels=point_labels,
                         return_logits=True,
                     )
+                    y_pred = y_pred[0]
+                    mask = (y > 0).to(torch.long).cpu()
+                    mask_pred = (y_pred > predictor.mask_threshold).to(torch.long).cpu()
+
                     loss = loss_fn(y_pred, y)
                     val_loss_logger.add_value(loss.item())
 
                     for metric_name, metric in metrics.items():
-                        metric(y_pred, y)
+                        metric(mask_pred, mask)
 
                 if printing:
                     print("--Val--")

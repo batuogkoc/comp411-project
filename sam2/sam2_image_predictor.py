@@ -98,7 +98,7 @@ class SAM2ImagePredictor:
         """
         self.reset_predictor()
         # Transform the image to the form expected by the model
-        if isinstance(image, np.ndarray):
+        if isinstance(image, np.ndarray) or isinstance(image, torch.Tensor):
             logging.info("For numpy array image, we assume (HxWxC) format")
             self._orig_hw = [image.shape[:2]]
         elif isinstance(image, Image):
@@ -297,9 +297,9 @@ class SAM2ImagePredictor:
             return_logits=return_logits,
         )
 
-        masks_np = masks.squeeze(0).float().detach().cpu().numpy()
-        iou_predictions_np = iou_predictions.squeeze(0).float().detach().cpu().numpy()
-        low_res_masks_np = low_res_masks.squeeze(0).float().detach().cpu().numpy()
+        masks_np = masks.squeeze(0).float()
+        iou_predictions_np = iou_predictions.squeeze(0).float()
+        low_res_masks_np = low_res_masks.squeeze(0).float()
         return masks_np, iou_predictions_np, low_res_masks_np
 
     def _prep_prompts(

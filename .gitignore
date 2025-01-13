@@ -11,4 +11,6 @@ checkpoints/*.pt
 
 Kvasir-SEG/
 kvasir-seg.zip
+wandb
+runs_tensorboard
 
