@@ -6,7 +6,9 @@ from PIL import Image
 import numpy as np
 from PIL import Image, ImageOps
 from matplotlib import pyplot as plt
-from datasets import load_dataset
+from torch_datasets import KvasirSEGDataset
+from albumentations.pytorch import ToTensorV2
+import albumentations as A
 
 checkpoint = "./checkpoints/sam2.1_hiera_large.pt"
 model_cfg = "configs/sam2.1/sam2.1_hiera_l.yaml"
@@ -48,8 +50,7 @@ def _predict_masks_test():
 
 
 def _generate_masks():
-    raw_dataset = load_dataset("kowndinya23/Kvasir-SEG")
-    train_set = raw_dataset["train"]
+    dataset = KvasirSEGDataset("train", transform=A.Compose([A.NoOp()]))
 
     mask_generator = SAM2AutomaticMaskGenerator(build_sam2(model_cfg, checkpoint))
 
@@ -58,8 +59,10 @@ def _generate_masks():
     fig, axs = plt.subplots(len(sample_idxs), 2 + 3)
 
     for i in sample_idxs:
-        image = np.array(train_set[i]["image"].convert("RGB"))
-        mask_gt = train_set[i]["annotation"]
+        image, mask_gt = dataset[i]
+        print(image.shape)
+        # image = np.array(train_set[i]["image"].convert("RGB"))
+        # mask_gt = train_set[i]["annotation"]
         axs[i, 0].imshow(image)
         axs[i, 1].imshow(mask_gt)
 
