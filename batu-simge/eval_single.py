@@ -60,7 +60,6 @@ def _generate_masks():
 
     for i in sample_idxs:
         image, mask_gt = dataset[i]
-        print(image.shape)
         # image = np.array(train_set[i]["image"].convert("RGB"))
         # mask_gt = train_set[i]["annotation"]
         axs[i, 0].imshow(image)

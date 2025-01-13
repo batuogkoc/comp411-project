@@ -39,6 +39,7 @@ if __name__ == "__main__":
     )
     x, y = dset[0]
     x_t, y_t = dset_transformed[0]
+    print(x.shape, y.shape)
     print(x_t.shape, y_t.shape)
 
     fig, axs = plt.subplots(2, 2)
