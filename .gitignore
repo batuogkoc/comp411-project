@@ -9,5 +9,6 @@ _C.*
 outputs/*
 checkpoints/*.pt
 
-fine_tune/Kvasir-SEG/
+Kvasir-SEG/
+kvasir-seg.zip
 
