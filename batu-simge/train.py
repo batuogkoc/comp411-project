@@ -1,4 +1,5 @@
 import torch
+import torchmetrics.segmentation
 from torchvision import datasets, transforms
 from torch.utils.data import DataLoader, random_split, Subset, ConcatDataset, Dataset
 from datetime import datetime
@@ -105,23 +106,18 @@ def train_experiment():
         num_epoch=config["max_epochs"],
         train_set=train_set,
         val_set=val_set,
+        experiment_name=EXPERIMENT_NAME,
         printing=True,
         tensorboard_logging=True,
         wandb_logging=True,
-        experiment_name=EXPERIMENT_NAME,
         metrics={
-            "mae": torchmetrics.MeanAbsoluteError(),
-            "mse": torchmetrics.MeanSquaredError(),
+            "mIoU": torchmetrics.segmentation.MeanIoU(1)
+            # "mae": torchmetrics.MeanAbsoluteError(),
+            # "mse": torchmetrics.MeanSquaredError(),
             # "acc": torchmetrics.Accuracy(task="multiclass", num_classes=10)
         },
         num_points=config["model"]["num_points"],
     )
-
-    x, y = train_set[0]
-
-    y_pred = model.apply(state.params, jnp.expand_dims(jnp.array(x), 0))[0]
-    print(optax.l2_loss(y_pred, jnp.array(y)).mean())
-    print(y_pred.shape)
 
 
 if __name__ == "__main__":

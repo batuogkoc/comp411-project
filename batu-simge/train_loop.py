@@ -20,6 +20,9 @@ from torch import nn
 from torch import optim
 from mask_from_y import extract_points_from_mask
 
+# def IoU(mask_pred, mask):
+#     intersection = torch.logical_and
+
 
 def train(
     project_name: str,
@@ -35,7 +38,7 @@ def train(
     tensorboard_logging: bool = True,
     wandb_logging: bool = True,
     metrics: dict[str, torchmetrics.Metric] = {},
-    num_points: int = 3;
+    num_points: int = 3,
 ):
     with torch.no_grad():
         if experiment_name is None:
@@ -65,22 +68,23 @@ def train(
                     metric.reset()
 
                 for i, (x, y) in enumerate(train_set):
-                    point_coords = extract_points_from_mask(
-                        y, num_points=num_points
-                    )
-                    point_labels=np.ones_like(point_coords)
+                    point_coords = extract_points_from_mask(y, num_points=num_points)
+                    point_labels = np.ones_like(point_coords)
                     predictor.set_image(x)
-                    mask_input, unnorm_coords, labels, unnorm_box = predictor._prep_prompts(point_coords=point_coords, point_labels=point_labels, normalize_coords=True, box=None, mask_logits=None)
-                    sparse_embeddings, dense_embeddings = predictor.model.sam_prompt_encoder(points=(unnorm_coords, labels), boxes=None, masks=None)
+                    # mask_input, unnorm_coords, labels, unnorm_box = predictor._prep_prompts(point_coords=point_coords, point_labels=point_labels, normalize_coords=True, box=None, mask_logits=None)
+                    # sparse_embeddings, dense_embeddings = predictor.model.sam_prompt_encoder(points=(unnorm_coords, labels), boxes=None, masks=None)
 
-                    
-                    # masks_pred, _, _ = predictor.predict(
-                    #     point_coords=points,
-                    #     point_labels=np.ones_like(points),
-                    #     return_logits=True
-                    # )
-                    # loss = torch.tensor(np.array(loss))
-                    # y_pred = torch.tensor(np.array(y_pred))
+                    y_pred, _, _ = predictor.predict(
+                        point_coords=point_coords,
+                        point_labels=point_labels,
+                        return_logits=True,
+                    )
+                    mask_pred = y_pred > predictor.mask_threshold
+                    loss = loss_fn(y_pred, y)
+
+                    predictor.model.zero_grad()
+                    loss.backward()
+                    optimizer.step()
 
                     epoch_metric_values = {}
                     for metric_name, metric in metrics.items():
@@ -141,12 +145,18 @@ def train(
                 val_loss_logger.reset()
 
                 for i, (x, y) in enumerate(val_set):
-                    # TODO
-                    loss, y_pred = eval_step(state, x.numpy(), y.numpy())
+                    point_coords = extract_points_from_mask(y, num_points=num_points)
+                    point_labels = np.ones_like(point_coords)
+                    predictor.set_image(x)
+                    # mask_input, unnorm_coords, labels, unnorm_box = predictor._prep_prompts(point_coords=point_coords, point_labels=point_labels, normalize_coords=True, box=None, mask_logits=None)
+                    # sparse_embeddings, dense_embeddings = predictor.model.sam_prompt_encoder(points=(unnorm_coords, labels), boxes=None, masks=None)
 
-                    loss = torch.tensor(np.array(loss))
-                    y_pred = torch.tensor(np.array(y_pred))
-
+                    y_pred, _, _ = predictor.predict(
+                        point_coords=point_coords,
+                        point_labels=point_labels,
+                        return_logits=True,
+                    )
+                    loss = loss_fn(y_pred, y)
                     val_loss_logger.add_value(loss.item())
 
                     for metric_name, metric in metrics.items():
