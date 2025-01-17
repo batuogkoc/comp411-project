@@ -39,7 +39,8 @@ def train(
     tensorboard_logging: bool = True,
     wandb_logging: bool = True,
     metrics: dict[str, torchmetrics.Metric] = {},
-    num_points: int = 3,
+    num_points: int = -1,
+    num_bg_points: int = -1,
 ):
     if experiment_name is None:
         experiment_name = datetime.now().strftime("%Y-%m-%dT%H-%M-%S")
@@ -69,17 +70,22 @@ def train(
 
             for i, (x, y) in enumerate(train_set):
                 y = (torch.tensor(y) > 0).to(predictor.model.device).to(torch.float32)
-                point_coords = extract_points_from_mask(y, num_points=num_points)
-                point_labels = np.ones(point_coords.shape[0])
+
                 predictor.set_image(x)
-                # mask_input, unnorm_coords, labels, unnorm_box = predictor._prep_prompts(point_coords=point_coords, point_labels=point_labels, normalize_coords=True, box=None, mask_logits=None)
-                # sparse_embeddings, dense_embeddings = predictor.model.sam_prompt_encoder(points=(unnorm_coords, labels), boxes=None, masks=None)
+                if num_points > 0:
+                    point_coords, point_labels = extract_points_from_mask(
+                        y, num_points=num_points, num_bg_points=num_bg_points
+                    )
+                else:
+                    point_coords = None
+                    point_labels = None
 
                 y_pred, _, _ = predictor.predict(
                     point_coords=point_coords,
                     point_labels=point_labels,
                     return_logits=True,
                 )
+
                 y_pred = y_pred[0]
 
                 mask = (y > 0).to(torch.long).cpu()
@@ -156,17 +162,21 @@ def train(
                         .to(predictor.model.device)
                         .to(torch.float32)
                     )
-                    point_coords = extract_points_from_mask(y, num_points=num_points)
-                    point_labels = np.ones(point_coords.shape[0])
                     predictor.set_image(x)
-                    # mask_input, unnorm_coords, labels, unnorm_box = predictor._prep_prompts(point_coords=point_coords, point_labels=point_labels, normalize_coords=True, box=None, mask_logits=None)
-                    # sparse_embeddings, dense_embeddings = predictor.model.sam_prompt_encoder(points=(unnorm_coords, labels), boxes=None, masks=None)
+                    if num_points > 0:
+                        point_coords, point_labels = extract_points_from_mask(
+                            y, num_points=num_points, num_bg_points=num_bg_points
+                        )
+                    else:
+                        point_coords = None
+                        point_labels = None
 
                     y_pred, _, _ = predictor.predict(
                         point_coords=point_coords,
                         point_labels=point_labels,
                         return_logits=True,
                     )
+
                     y_pred = y_pred[0]
                     mask = (y > 0).to(torch.long).cpu()
                     mask_pred = (y_pred > predictor.mask_threshold).to(torch.long).cpu()
@@ -189,7 +199,10 @@ def train(
                     {
                         "predict_vis": wandb.Image(
                             generate_masks_with_points(
-                                predictor, val_set, num_points=num_points
+                                predictor,
+                                val_set,
+                                num_points=num_points,
+                                num_bg_points=num_bg_points,
                             )
                         )
                     }
