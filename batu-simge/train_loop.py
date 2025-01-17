@@ -18,7 +18,7 @@ from train_helpers import (
 from sam2.sam2_image_predictor import SAM2ImagePredictor
 from torch import nn
 from torch import optim
-from mask_from_y import extract_points_from_mask, generate_masks_with_points
+from utils import extract_points_from_mask, generate_masks_with_points
 
 
 # def IoU(mask_pred, mask):
