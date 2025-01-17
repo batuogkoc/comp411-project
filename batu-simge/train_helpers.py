@@ -96,7 +96,7 @@ def log_metrics(
     else:
         to_log = {}
     if extra:
-        to_log = {**to_log, **{prefix + name: value for name, value in extra.items()}}
+        to_log = {**to_log, **{(prefix + name): value for name, value in extra.items()}}
     if log_wandb:
         wandb.log(to_log, step=global_step)
 

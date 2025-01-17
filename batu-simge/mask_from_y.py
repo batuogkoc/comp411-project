@@ -14,7 +14,7 @@ from torch.utils.data import DataLoader
 def extract_points_from_mask(mask, num_points, normalize=False):
     if not isinstance(mask, np.ndarray):
         if isinstance(mask, torch.Tensor):
-            mask = mask.cpu().numpy()
+            mask = mask.detach().cpu().numpy()
         else:
             mask = np.array(mask)
     if mask.max() > 1:
@@ -53,41 +53,23 @@ def visualize_points_on_mask(mask):
     plt.savefig("points.png")
 
 
-def generate_masks_with_points(num_points=3):
-    checkpoint = "./checkpoints/sam2.1_hiera_large.pt"
-    model_cfg = "configs/sam2.1/sam2.1_hiera_l.yaml"
-    predictor = SAM2ImagePredictor(build_sam2(model_cfg, checkpoint))
-
-    # raw_dataset = load_dataset("kowndinya23/Kvasir-SEG")
-    # train_set = raw_dataset["train"]
-    dataset = KvasirSEGDataset("train", transform=A.Compose([A.Resize(1024, 1024)]))
-    loader = DataLoader(dataset, 5, shuffle=False)
-    images, masks = next(iter(loader))
-    points_batch = extract_points_from_mask_batched(masks, num_points=num_points)
-    predictor.set_image_batch([*images])
-    masks_pred, _, _ = predictor.predict_batch(
-        point_coords_batch=points_batch, point_labels_batch=np.ones_like(points_batch)
-    )
-    sample_idxs = [0, 1, 2, 3]
-
+def generate_masks_with_points(predictor, dataset, num_points=3, num_samples=5):
     num_predicted_masks = 3
     fig, axs = plt.subplots(
-        len(sample_idxs), 2 + num_predicted_masks, figsize=(15, 5 * len(sample_idxs))
+        num_samples, 2 + num_predicted_masks, figsize=(15, 5 * num_samples)
     )
 
-    for row, (idx, points) in enumerate(zip(sample_idxs, points_batch)):
-        image, mask_gt = dataset[idx]
-        # image = np.array(image.convert("RGB"))
+    for row, (image, mask_gt) in enumerate([dataset[i] for i in range(num_samples)]):
+        mask_gt = (mask_gt > 0).astype(np.float32)
 
-        # mask_gt = train_set[idx]["annotation"].convert("L")
-        # points = extract_points_from_mask(mask_gt, num_points)
-        # print(points)
+        points = extract_points_from_mask(mask_gt, num_points)
         with torch.inference_mode(), torch.autocast("cuda", dtype=torch.bfloat16):
             predictor.set_image(image)
             predicted_masks, _, _ = predictor.predict(
                 point_coords=points,
                 point_labels=np.ones(len(points)),
             )
+            predicted_masks = predicted_masks.detach().cpu().numpy()
         axs[row, 0].imshow(image)
         axs[row, 0].set_title("Original Image")
         axs[row, 0].scatter(
@@ -107,8 +89,7 @@ def generate_masks_with_points(num_points=3):
             axs[row, 2 + col].set_title(f"Predicted Mask {col + 1}")
             axs[row, 2 + col].axis("off")
 
-    plt.savefig("batu-simge/predicted_masks.png")
-    plt.show()
+    return fig
 
 
 def _visualize_test():
@@ -116,7 +97,17 @@ def _visualize_test():
     visualize_points_on_mask(mask_gt)
 
 
+def _multi_visualize_test():
+    checkpoint = "./checkpoints/sam2.1_hiera_large.pt"
+    model_cfg = "configs/sam2.1/sam2.1_hiera_l.yaml"
+    predictor = SAM2ImagePredictor(build_sam2(model_cfg, checkpoint))
+
+    dataset = KvasirSEGDataset("train", transform=A.Compose([A.Resize(1024, 1024)]))
+    fig = generate_masks_with_points(predictor, dataset, 10)
+    fig.savefig("batu-simge/predicted_masks.png")
+
+
 # generate_masks_with_points(num_points=3)
 if __name__ == "__main__":
     # _visualize_test()
-    generate_masks_with_points(3)
+    _multi_visualize_test()

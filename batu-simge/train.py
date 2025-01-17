@@ -24,7 +24,7 @@ def train_experiment():
 
     # Use wandb-core, temporary for wandb's new backend
     wandb.init(
-        project="linear-lossless-fir",
+        project="sam2-replication",
         name=EXPERIMENT_NAME,
         config={
             "rng_seed": 42,
@@ -42,9 +42,9 @@ def train_experiment():
                 "train_mask_decoder": True,
                 "train_prompt_encoder": True,
                 "train_image_encoder": False,
-                "num_points": 3,
+                "num_points": 10,
             },
-            "learning_rate": 3e-4,
+            "learning_rate": 1e-6,
         },
     )
     config = wandb.config
@@ -95,6 +95,7 @@ def train_experiment():
     predictor.model.sam_prompt_encoder.train(config["model"]["train_prompt_encoder"])
     predictor.model.sam_mask_decoder.train(config["model"]["train_mask_decoder"])
     loss_fn = torch.nn.BCEWithLogitsLoss()
+    # loss_fn = torch.nn.BCELoss()
     optimizer = optim.Adam(predictor.model.parameters(), lr=config["learning_rate"])
 
     state, metrics = train(
