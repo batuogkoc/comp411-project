@@ -19,7 +19,9 @@ from pprint import pprint
 
 def train_experiment(config=None):
     # Constants
-    EXPERIMENT_NAME = datetime.now().strftime("%Y-%m-%dT%H-%M-%S") + "_sampled-mask"
+    EXPERIMENT_NAME = (
+        "sweep-" + datetime.now().strftime("%Y-%m-%dT%H-%M-%S") + "_sampled-mask"
+    )
 
     with wandb.init(config=config, name=EXPERIMENT_NAME, project="sam2-replication"):
         config = wandb.config
@@ -127,6 +129,32 @@ def _regular_training():
             },
         }
     )
+    train_experiment(
+        config={
+            "rng_seed": 42,
+            "max_epochs": 50,
+            "printing": True,
+            "tensorboard_logging": True,
+            "wandb_logging": True,
+            "dataset": {
+                "description": "KvasirSEG from huggingface",
+                "image_size_hw": [1024, 1024],
+            },
+            "model": {
+                "checkpoint": "./checkpoints/sam2.1_hiera_large.pt",
+                "config_file": "configs/sam2.1/sam2.1_hiera_l.yaml",
+                "train_mask_decoder": True,
+                "train_prompt_encoder": True,
+                "train_image_encoder": False,
+                "num_points": 0,
+                "num_bg_points": 0,
+            },
+            "optimizer": {
+                "type": "adam",
+                "learning_rate": 1e-7,
+            },
+        }
+    )
 
 
 def dict_to_wandb_sweep_constant_config_params(input_dict: dict):
@@ -142,40 +170,114 @@ def dict_to_wandb_sweep_constant_config_params(input_dict: dict):
 
 
 def _sweep():
-    const_config = {
-        "rng_seed": 42,
-        "max_epochs": 5,
-        "printing": True,
-        "tensorboard_logging": True,
-        "wandb_logging": True,
-        "dataset": {
-            "description": "KvasirSEG from huggingface",
-            "image_size_hw": [1024, 1024],
-        },
-        "model": {
-            "checkpoint": "./checkpoints/sam2.1_hiera_large.pt",
-            "config_file": "configs/sam2.1/sam2.1_hiera_l.yaml",
-            "train_mask_decoder": True,
-            "train_prompt_encoder": True,
-            "train_image_encoder": False,
-            # "num_points": 10,
-            # "num_bg_points": 20,
-        },
-        "optimizer": {
-            # "type": "adam",
-            # "learning_rate": 1e-7,
-        },
-    }
+    # const_config = {
+    #     "experiment_name_prefix": "sweep-",
+    #     "rng_seed": 42,
+    #     "max_epochs": 5,
+    #     "printing": True,
+    #     "tensorboard_logging": True,
+    #     "wandb_logging": True,
+    #     "dataset": {
+    #         "description": "KvasirSEG from huggingface",
+    #         "image_size_hw": [1024, 1024],
+    #     },
+    #     "model": {
+    #         "checkpoint": "./checkpoints/sam2.1_hiera_large.pt",
+    #         "config_file": "configs/sam2.1/sam2.1_hiera_l.yaml",
+    #         "train_mask_decoder": True,
+    #         "train_prompt_encoder": True,
+    #         "train_image_encoder": False,
+    #         # "num_points": 10,
+    #         # "num_bg_points": 20,
+    #     },
+    #     "optimizer": {
+    #         "type": "adam",
+    #         "learning_rate": 1e-7,
+    #     },
+    # }
+    # pprint(dict_to_wandb_sweep_constant_config_params(const_config))
+
     sweep_config = {
-        "method": "grid",
+        "method": "random",
         "metric": {"name": "val/mIoU", "goal": "maximize"},
-        "parameters": {},
+        "parameters": {
+            "dataset": {
+                "parameters": {
+                    "description": {"value": "KvasirSEG from " "huggingface"},
+                    "image_size_hw": {"value": [1024, 1024]},
+                }
+            },
+            "experiment_name_prefix": {"value": "sweep_"},
+            "max_epochs": {"value": 5},
+            "model": {
+                "parameters": {
+                    "checkpoint": {"value": "./checkpoints/sam2.1_hiera_large.pt"},
+                    "config_file": {"value": "configs/sam2.1/sam2.1_hiera_l.yaml"},
+                    "train_image_encoder": {"value": False},
+                    "train_mask_decoder": {"value": True},
+                    "train_prompt_encoder": {"value": True},
+                    "num_points": {"value": 0},
+                    "num_bg_points": {"value": 0},
+                }
+            },
+            "optimizer": {
+                "parameters": {
+                    "learning_rate": {
+                        "distribution": "log_uniform_values",
+                        "max": 3e-7,
+                        "min": 5e-8,
+                    },
+                    "type": {"value": "adam"},
+                }
+            },
+            "printing": {"value": True},
+            "rng_seed": {"value": 42},
+            "tensorboard_logging": {"value": True},
+            "wandb_logging": {"value": True},
+        },
     }
-    sweep_config.update(dict_to_wandb_sweep_constant_config_params(const_config))
-    sweep_id = wandb.sweep(
-        sweep_config,
-    )
+    sweep_id = wandb.sweep(sweep_config, project="sam2-replication")
+    wandb.agent(sweep_id, train_experiment, count=6)
+    # print("-" * 10 + "SWEEP 2" + "-" * 10)
+    # sweep_config = {
+    #     "method": "grid",
+    #     "metric": {"name": "val/mIoU", "goal": "maximize"},
+    #     "parameters": {
+    #         "dataset": {
+    #             "parameters": {
+    #                 "description": {"value": "KvasirSEG from " "huggingface"},
+    #                 "image_size_hw": {"value": [1024, 1024]},
+    #             }
+    #         },
+    #         "experiment_name_prefix": {"value": "sweep_"},
+    #         "max_epochs": {"value": 5},
+    #         "model": {
+    #             "parameters": {
+    #                 "checkpoint": {"value": "./checkpoints/sam2.1_hiera_large.pt"},
+    #                 "config_file": {"value": "configs/sam2.1/sam2.1_hiera_l.yaml"},
+    #                 "train_image_encoder": {"value": False},
+    #                 "train_mask_decoder": {"value": True},
+    #                 "train_prompt_encoder": {"value": True},
+    #                 "num_points": {"values": [0, 10]},
+    #                 "num_bg_points": {"values": [0, 20]},
+    #             }
+    #         },
+    #         "optimizer": {
+    #             "parameters": {
+    #                 "learning_rate": {"value": 1e-07},
+    #                 "type": {"value": "adam"},
+    #             }
+    #         },
+    #         "printing": {"value": True},
+    #         "rng_seed": {"value": 42},
+    #         "tensorboard_logging": {"value": True},
+    #         "wandb_logging": {"value": True},
+    #     },
+    # }
+    # sweep_id = wandb.sweep(sweep_config, project="sam2-replication")
+    # wandb.agent(sweep_id, train_experiment)
 
 
 if __name__ == "__main__":
-    _sweep()
+    # _sweep()
+    _regular_training()
