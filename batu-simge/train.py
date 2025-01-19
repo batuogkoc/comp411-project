@@ -13,14 +13,26 @@ from sam2.sam2_image_predictor import SAM2ImagePredictor
 from sam2.build_sam import build_sam2
 import albumentations as A
 from torch import optim
-from train_loop import train
+from train_loop import train, evaluate
 from pprint import pprint
+
+
+def dict_to_wandb_sweep_constant_config_params(input_dict: dict):
+    ret = {}
+    for key, value in input_dict.items():
+        if type(value) is dict:
+            value = dict_to_wandb_sweep_constant_config_params(value)
+            ret[key] = {"parameters": value}
+        else:
+            ret[key] = {"value": value}
+
+    return ret
 
 
 def train_experiment(config=None):
     # Constants
     EXPERIMENT_NAME = (
-        "sweep-" + datetime.now().strftime("%Y-%m-%dT%H-%M-%S") + "_sampled-mask"
+        "" + datetime.now().strftime("%Y-%m-%dT%H-%M-%S") + "_sampled-mask"
     )
 
     with wandb.init(config=config, name=EXPERIMENT_NAME, project="sam2-replication"):
@@ -103,32 +115,32 @@ def train_experiment(config=None):
 
 
 def _regular_training():
-    train_experiment(
-        config={
-            "rng_seed": 42,
-            "max_epochs": 50,
-            "printing": True,
-            "tensorboard_logging": True,
-            "wandb_logging": True,
-            "dataset": {
-                "description": "KvasirSEG from huggingface",
-                "image_size_hw": [1024, 1024],
-            },
-            "model": {
-                "checkpoint": "./checkpoints/sam2.1_hiera_large.pt",
-                "config_file": "configs/sam2.1/sam2.1_hiera_l.yaml",
-                "train_mask_decoder": True,
-                "train_prompt_encoder": True,
-                "train_image_encoder": False,
-                "num_points": 10,
-                "num_bg_points": 20,
-            },
-            "optimizer": {
-                "type": "adam",
-                "learning_rate": 1e-7,
-            },
-        }
-    )
+    # train_experiment(
+    #     config={
+    #         "rng_seed": 42,
+    #         "max_epochs": 50,
+    #         "printing": True,
+    #         "tensorboard_logging": True,
+    #         "wandb_logging": True,
+    #         "dataset": {
+    #             "description": "KvasirSEG from huggingface",
+    #             "image_size_hw": [1024, 1024],
+    #         },
+    #         "model": {
+    #             "checkpoint": "./checkpoints/sam2.1_hiera_large.pt",
+    #             "config_file": "configs/sam2.1/sam2.1_hiera_l.yaml",
+    #             "train_mask_decoder": True,
+    #             "train_prompt_encoder": True,
+    #             "train_image_encoder": False,
+    #             "num_points": 10,
+    #             "num_bg_points": 20,
+    #         },
+    #         "optimizer": {
+    #             "type": "adam",
+    #             "learning_rate": 1e-7,
+    #         },
+    #     }
+    # )
     train_experiment(
         config={
             "rng_seed": 42,
@@ -155,18 +167,6 @@ def _regular_training():
             },
         }
     )
-
-
-def dict_to_wandb_sweep_constant_config_params(input_dict: dict):
-    ret = {}
-    for key, value in input_dict.items():
-        if type(value) is dict:
-            value = dict_to_wandb_sweep_constant_config_params(value)
-            ret[key] = {"parameters": value}
-        else:
-            ret[key] = {"value": value}
-
-    return ret
 
 
 def _sweep():
@@ -278,6 +278,47 @@ def _sweep():
     # wandb.agent(sweep_id, train_experiment)
 
 
+def _eval():
+    checkpoint_dict = torch.load(
+        "runs_checkpoints/2025-01-19T15-09-20_sampled-mask/0.pt"
+    )
+    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+    print("Device:", device)
+    print(checkpoint_dict.keys())
+    model = checkpoint_dict["model"]
+    num_points = checkpoint_dict["num_points"]
+    num_bg_points = checkpoint_dict["num_bg_points"]
+    metrics = checkpoint_dict["metrics"]
+    print(metrics)
+    model.to(device)
+    model.eval()
+    predictor = SAM2ImagePredictor(model)
+    loss_fn = torch.nn.BCEWithLogitsLoss()
+    test_dataset = KvasirSEGDataset(
+        "validation",
+        transform=A.Compose(
+            [
+                A.Resize(
+                    height=1024,
+                    width=1024,
+                ),
+            ]
+        ),
+    )
+    evaluate(
+        predictor,
+        loss_fn,
+        test_dataset,
+        printing=True,
+        tensorboard_logging=True,
+        wandb_logging=True,
+        metrics={"mIoU": torchmetrics.segmentation.MeanIoU(2, input_format="index")},
+        num_points=num_points,
+        num_bg_points=num_bg_points,
+    )
+
+
 if __name__ == "__main__":
     # _sweep()
     _regular_training()
+    # _eval()

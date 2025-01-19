@@ -13,4 +13,5 @@ Kvasir-SEG/
 kvasir-seg.zip
 wandb
 runs_tensorboard
+runs_checkpoints
 
